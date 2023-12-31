@@ -9,14 +9,14 @@
       version:          1.0.0
       name:             lockfree
       description:      helper functions for moodycamel single writer, single consumer lock-free queues
-      license:          MIT
+      license:          Apache 2
       dependencies:     juce_core
 
      END_JUCE_MODULE_DECLARATION
 
 #endif
 
-#include "readerwriterqueue.h"
+#include "deps/readerwriterqueue/readerwriterqueue.h"
 #include <functional>
 #include <juce_core/juce_core.h>
 
@@ -35,31 +35,20 @@ public:
   void clear() { queue = TypedQueue(queue.max_capacity()); }
 
   // push an item into the queue
-  bool push(T const &t) {
-    jassert(writeThreadOK());
-    return queue.try_enqueue(t);
-  }
+  bool push(T const &t) { return queue.try_enqueue(t); }
 
   // push an item into the queue using move semantics
-  bool push(T &&t) {
-    jassert(writeThreadOK());
-    return queue.try_enqueue(t);
-  }
+  bool push(T &&t) { return queue.try_enqueue(t); }
 
   // push an item into the queue using emplace semantics
   template <typename... Args> bool emplace(Args &&...args) {
-    jassert(writeThreadOK());
     return queue.try_emplace(std::forward<Args>(args)...);
   }
 
   // pop an item from the queue
-  bool pop(T &t) {
-    jassert(readThreadOK());
-    return queue.try_dequeue(t);
-  }
+  bool pop(T &t) { return queue.try_dequeue(t); }
 
   void forEach(CallBack cbk) {
-    jassert(readThreadOK());
     T t;
     while (pop(t))
       cbk(t);
@@ -68,34 +57,6 @@ public:
   TypedQueue &getQueue() const noexcept { return queue; }
 
 private:
-  bool writeThreadOK() {
-#if JUCE_DEBUG
-    if (writeThread == nullptr) {
-      writeThread = juce::Thread::getCurrentThreadId();
-      return true;
-    } else
-      return (juce::Thread::getCurrentThreadId() == writeThread);
-#else
-    return true;
-#endif
-  }
-
-  bool readThreadOK() {
-#if JUCE_DEBUG
-    if (readThread == nullptr) {
-      readThread = juce::Thread::getCurrentThreadId();
-      return true;
-    } else
-      return (juce::Thread::getCurrentThreadId() == readThread);
-#else
-    return true;
-#endif
-  }
-
-#if JUCE_DEBUG
-  std::atomic<juce::Thread::ThreadID> readThread = nullptr;
-  std::atomic<juce::Thread::ThreadID> writeThread = nullptr;
-#endif
   TypedQueue queue;
 };
 
@@ -200,7 +161,6 @@ private:
   // The audio thread pushes objects to this queue, Loader destroys them in its
   // own thread
   ObjectQueue toDestroy;
-
 };
 } // namespace lockfree
 } // namespace musikhack
