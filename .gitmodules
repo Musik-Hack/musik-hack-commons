@@ -1,0 +1,6 @@
+[submodule "deps/readerwriterqueue"]
+	path = deps/readerwriterqueue
+	url = https://github.com/cameron314/readerwriterqueue.git
+[submodule "deps/JUCE"]
+	path = deps/JUCE
+	url = https://github.com/juce-framework/JUCE.git
