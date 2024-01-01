@@ -30,30 +30,36 @@ public:
 
   AsyncFifo(int size = 1024) : queue(size) {}
 
-  // Resize the queue, but deletes all existing data
+  // Resize the queue, but deletes all existing data.
+  // Not thread safe!
   void resize(int size) { queue = TypedQueue(size); }
+
+  // Wipes out the queue and resets it to its initial state
+  // Not thread safe!
   void clear() { queue = TypedQueue(queue.max_capacity()); }
 
   // push an item into the queue
-  bool push(T const &t) { return queue.try_enqueue(t); }
+  bool push(T const &item) { return queue.try_enqueue(item); }
 
   // push an item into the queue using move semantics
-  bool push(T &&t) { return queue.try_enqueue(t); }
+  bool push(T &&item) { return queue.try_enqueue(item); }
 
   // push an item into the queue using emplace semantics
   template <typename... Args> bool emplace(Args &&...args) {
     return queue.try_emplace(std::forward<Args>(args)...);
   }
 
-  // pop an item from the queue
-  bool pop(T &t) { return queue.try_dequeue(t); }
+  // pop from the queue into item
+  bool pop(T &item) { return queue.try_dequeue(item); }
 
+  // pop each item out of the queue and run a callback on it
   void forEach(CallBack cbk) {
-    T t;
-    while (pop(t))
-      cbk(t);
+    T item;
+    while (pop(item))
+      cbk(item);
   }
 
+  // return a reference to the underlying queue
   TypedQueue &getQueue() const noexcept { return queue; }
 
 private:
