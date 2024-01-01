@@ -2,7 +2,7 @@
 
 JUCE modules and CMake structure for the common good!
 
-# Prerequisites
+## Prerequisites
 
 - cmake 3.2+
 - git
