@@ -9,13 +9,14 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <memory>
 #include <musikhack/lockfree/lockfree.h>
 
 //==============================================================================
 /**
  */
 
-enum class MeterType { peak, random };
+enum class MeterType { peak, rms };
 using MeterPair = std::pair<MeterType, float>;
 
 class LockfreeExampleProcessor : public juce::AudioProcessor {
@@ -61,14 +62,25 @@ public:
   void getStateInformation(juce::MemoryBlock &destData) override;
   void setStateInformation(const void *data, int sizeInBytes) override;
 
+  // call via the editor/message thread
+  void queueSoundLoad(musikhack::lockfree::LoadableSound::Options const &opts) {
+    soundLoader.load(opts);
+  }
+
 private:
   float step = 0.f;
+  float piStep = 0.f;
   float phase = 0.f;
   float slowPhase = 0.f;
-  juce::Random random;
+  size_t samplePosition = 0;
+
+  juce::AudioBuffer<float> RMSBuffer;
+  size_t RMSBufferPosition = 0;
 
   musikhack::lockfree::AsyncFifo<float> vizQueue;
   musikhack::lockfree::AsyncFifo<MeterPair> meterQueue;
+  musikhack::lockfree::SoundLoader soundLoader;
+  std::unique_ptr<musikhack::lockfree::LoadableSound> loadedSound;
   //==============================================================================
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LockfreeExampleProcessor)
 };

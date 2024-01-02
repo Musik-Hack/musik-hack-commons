@@ -30,7 +30,7 @@ target_compile_definitions(LockfreeExample
         JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
         JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
         JUCE_VST3_CAN_REPLACE_VST2=0
-        MUSIKHACK_SAMPLES_DIR=${MUSIKHACK_SAMPLES_DIR})
+        MUSIKHACK_SAMPLES_DIR="${MUSIKHACK_SAMPLES_DIR}")
 
 
 # juce_add_binary_data(AudioPluginData SOURCES ...)
@@ -43,6 +43,7 @@ target_link_libraries(LockfreeExample
         juce::juce_audio_processors
         juce::juce_gui_basics
         juce::juce_dsp
+        juce::juce_audio_formats
         musikhack::lockfree
     PUBLIC
         juce::juce_recommended_config_flags

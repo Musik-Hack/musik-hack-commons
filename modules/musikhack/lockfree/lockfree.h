@@ -18,7 +18,9 @@
 
 #include "deps/readerwriterqueue/readerwriterqueue.h"
 #include <functional>
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_core/juce_core.h>
+#include <juce_dsp/juce_dsp.h>
 
 namespace musikhack {
 namespace lockfree {
@@ -59,6 +61,18 @@ public:
       cbk(item);
   }
 
+  // pop each item out of the queue, but only run the callback on the last one
+  void forLast(CallBack cbk) {
+    bool ran = false;
+    T item;
+    while (pop(item)) {
+      ran = true;
+    }
+
+    if (ran)
+      cbk(item);
+  }
+
   // return a reference to the underlying queue
   TypedQueue &getQueue() const noexcept { return queue; }
 
@@ -85,28 +99,38 @@ public:
   using CallBack = std::function<void(ObjPtr)>;
 
   Loader(const juce::String &name, size_t initialSize = 25,
-         bool shouldOnlyUseLastMessage = false, int timeoutInMs = 100)
+         bool shouldOnlyUseLastMessage = false)
       : juce::Thread(name), onlyUseLastMessage(shouldOnlyUseLastMessage),
-        timeout(timeoutInMs), toLoad(initialSize), loaded(initialSize),
-        toDestroy(initialSize) {}
+        toLoad(initialSize), loaded(initialSize), toDestroy(initialSize) {}
 
   // Load options into the queue for creation
   bool load(Options &&creator) {
-    auto enqueued = creator ? toLoad.try_enqueue(creator) : false;
-    return enqueued;
+    const auto ret = toLoad.try_enqueue(creator);
+    notify();
+    return ret;
+  }
+
+  // Load options into the queue for creation
+  bool load(const Options &creator) {
+    const auto ret = toLoad.try_enqueue(creator);
+    notify();
+    return ret;
   }
 
   // Queue an object for destruction
-  void destroy(ObjPtr object) { toDestroy.enqueue(std::move(object)); }
+  void destroy(ObjPtr object) {
+    toDestroy.enqueue(std::move(object));
+    notify();
+  }
 
   // Pop a single loaded object from the queue
   bool getLoaded(ObjPtr &loadedT) { return loaded.try_dequeue(loadedT); }
 
   // For each loaded object, run a callback on that object
   void forEach(CallBack cbk) {
-    T t;
-    while (pop(t))
-      cbk(t);
+    ObjPtr t;
+    while (loaded.try_dequeue(t))
+      cbk(std::move(t));
   }
 
   // Start the loader background thread
@@ -120,7 +144,7 @@ public:
       if (threadShouldExit())
         return;
 
-      sleep(timeout);
+      wait(-1);
     }
   }
 
@@ -131,9 +155,11 @@ private:
     Options creator;
 
     if (onlyUseLastMessage) {
+      auto atLeastOne = false;
       while (toLoad.try_dequeue(creator)) {
+        atLeastOne = true;
       }
-      if (creator) {
+      if (atLeastOne) {
         loaded.try_enqueue(std::make_unique<T>(creator));
       }
     } else {
@@ -153,9 +179,6 @@ private:
   // the last one in the queue
   bool onlyUseLastMessage;
 
-  // The timeout interval for the thread to sleep between queue checks
-  int timeout;
-
   // Some other thread (the GUI or audio thread, but not both!) writes creator
   // structs, Loader consumes them in its own thread
   OptionsQueue toLoad;
@@ -168,5 +191,65 @@ private:
   // own thread
   ObjectQueue toDestroy;
 };
+
+class LoadableSound {
+
+public:
+  struct Options {
+    juce::String name;
+    juce::File path;
+    juce::AudioFormatManager *formatManager;
+  };
+
+  LoadableSound(Options const &opts) : name(opts.name) {
+    // Bail if the file doesn't exist
+    if (!opts.path.existsAsFile()) {
+      return;
+    }
+
+    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        opts.formatManager->createReaderFor(opts.path));
+
+    if (!reader) {
+      return;
+    }
+
+    const int numChannels = (int)reader->numChannels;
+    const int numSamples = (int)reader->lengthInSamples;
+
+    buffer.setSize(numChannels, numSamples);
+    auto writePointers = buffer.getArrayOfWritePointers();
+
+    if (reader->read(writePointers, numChannels, 0, numSamples)) {
+      valid = true;
+    };
+  }
+
+  juce::String getName() const { return name; }
+
+  juce::dsp::AudioBlock<float> getBlock(size_t startSample, size_t numSamples) {
+    const auto numSamplesInBuffer = getNumSamples();
+
+    if (numSamplesInBuffer == 0) {
+      return juce::dsp::AudioBlock<float>();
+    }
+
+    startSample = juce::jmin(startSample, numSamplesInBuffer - 1);
+    numSamples = juce::jmin(numSamples, numSamplesInBuffer - startSample);
+    return juce::dsp::AudioBlock<float>(buffer).getSubBlock(startSample,
+                                                            numSamples);
+  }
+
+  size_t getNumChannels() const { return (size_t)buffer.getNumChannels(); }
+  size_t getNumSamples() const { return (size_t)buffer.getNumSamples(); }
+
+private:
+  bool valid = false;
+  juce::String name;
+  juce::AudioBuffer<float> buffer;
+};
+
+using SoundLoader = Loader<LoadableSound, LoadableSound::Options>;
+
 } // namespace lockfree
 } // namespace musikhack

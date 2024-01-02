@@ -8,14 +8,37 @@
 
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include <cmath>
+#include <unordered_map>
 
 //==============================================================================
 LockfreeExampleEditor::LockfreeExampleEditor(LockfreeExampleProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p) {
   // Make sure that before the constructor has finished, you've set the
   // editor's size to whatever you need it to be.
+  formatManager.registerBasicFormats();
+  const auto sampleDir = juce::File(MUSIKHACK_SAMPLES_DIR);
+  sampleFiles =
+      sampleDir.findChildFiles(juce::File::findFiles, true, "*.wav;*.aif");
+
+  fileSelector.setRange(0, sampleFiles.size() - 1, 1);
+  fileSelector.setSliderStyle(juce::Slider::SliderStyle::LinearHorizontal);
+  fileSelector.onValueChange = [this]() {
+    const auto index = static_cast<int>(fileSelector.getValue());
+    const auto f = sampleFiles[index];
+    audioProcessor.queueSoundLoad(
+        {f.getFileNameWithoutExtension(), f, &formatManager});
+  };
+  fileSelector.textFromValueFunction = [this](double value) {
+    const auto index = static_cast<int>(value);
+    const auto f = sampleFiles[index];
+    return f.getFileNameWithoutExtension();
+  };
+
+  addAndMakeVisible(fileSelector);
+
   setSize(400, 200);
-  startTimerHz(60);
+  startTimerHz(30);
 }
 
 LockfreeExampleEditor::~LockfreeExampleEditor() { stopTimer(); }
@@ -26,16 +49,18 @@ void LockfreeExampleEditor::timerCallback() { repaint(); }
 void LockfreeExampleEditor::paint(juce::Graphics &g) {
   // (Our component is opaque, so we must completely fill the background with a
   // solid colour)
-  g.fillAll(
-      getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-  g.setColour(juce::Colours::white);
+  const juce::Colour pink(215, 145, 188);
+  const juce::Colour offWhite(247, 244, 242);
+  g.fillAll(juce::Colour(28, 28, 28));
 
   auto x = xPos;
   const auto maxWidth = getWidth();
   auto draw = true;
-  audioProcessor.getVizQueue().forEach([&](float &sample) {
+  audioProcessor.getVizQueue().forEach([&](float sample) {
+    sample = juce::jlimit(-1.f, 1.f, sample);
     if (draw) {
-      g.drawRect(x / 2, 100 + static_cast<int>(sample * 90), 2, 2);
+      g.setColour(pink);
+      g.drawRect(x / 2, 90 + static_cast<int>(sample * 80), 1, 2);
       x++;
 
       if (x > maxWidth * 2) {
@@ -46,24 +71,30 @@ void LockfreeExampleEditor::paint(juce::Graphics &g) {
   });
   xPos = x;
 
-  const auto center = getWidth() / 2.;
-  const auto indicatorWidth = 40.;
+  const auto indicatorWidth = 15.;
+  std::unordered_map<MeterType, bool> done;
+  done[MeterType::peak] = false;
+  done[MeterType::rms] = false;
   audioProcessor.getMeterQueue().forEach([&](MeterPair &pair) {
-    if (pair.first == MeterType::peak) {
-      g.setColour(juce::Colours::red.withAlpha(pair.second));
-      g.fillEllipse(static_cast<float>(center - indicatorWidth / 2.), 30,
-                    indicatorWidth, indicatorWidth);
+    auto val = juce::jmin(1.f, pair.second);
 
-    } else if (pair.first == MeterType::random) {
-      g.setColour(juce::Colours::yellow.withAlpha(pair.second));
-      g.fillEllipse(static_cast<float>(center - indicatorWidth / 2.),
-                    static_cast<float>(getBottom()) - 100.f, indicatorWidth,
-                    indicatorWidth);
+    if (pair.first == MeterType::peak && !done[MeterType::peak]) {
+      lastMeterVal *= 0.9f;
+      lastMeterVal = juce::jmax(val, lastMeterVal);
+      g.setColour(offWhite.withAlpha(lastMeterVal));
+      g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 10), 10,
+                    indicatorWidth, indicatorWidth);
+      done[MeterType::peak] = true;
+
+    } else if (pair.first == MeterType::rms && !done[MeterType::rms]) {
+      g.setColour(offWhite.withAlpha(val));
+      g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 40), 10,
+                    indicatorWidth, indicatorWidth);
+      done[MeterType::rms] = true;
     }
   });
 }
 
 void LockfreeExampleEditor::resized() {
-  // This is generally where you'll want to lay out the positions of any
-  // subcomponents in your editor..
+  fileSelector.setBounds(20, getBottom() - 25, getWidth() - 40, 20);
 }

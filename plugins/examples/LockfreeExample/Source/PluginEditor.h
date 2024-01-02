@@ -29,7 +29,11 @@ private:
   // This reference is provided as a quick way for your editor to
   // access the processor object that created it.
   LockfreeExampleProcessor &audioProcessor;
+  juce::AudioFormatManager formatManager;
+  juce::Array<juce::File> sampleFiles;
+  juce::Slider fileSelector;
   int xPos = 0;
+  float lastMeterVal = 0.f;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LockfreeExampleEditor)
 };

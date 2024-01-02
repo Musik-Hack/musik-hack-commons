@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "lockfree/lockfree.h"
 #include <juce_dsp/juce_dsp.h>
 
 //==============================================================================
@@ -22,12 +23,15 @@ LockfreeExampleProcessor::LockfreeExampleProcessor()
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)
 #endif
               ),
-      random(234), vizQueue(2048), meterQueue(128)
+      vizQueue(2048), meterQueue(128), soundLoader("SoundLoader", 5, true)
 #endif
 {
+  soundLoader.startThread();
 }
 
-LockfreeExampleProcessor::~LockfreeExampleProcessor() {}
+LockfreeExampleProcessor::~LockfreeExampleProcessor() {
+  soundLoader.stopThread(2000);
+}
 
 //==============================================================================
 const juce::String LockfreeExampleProcessor::getName() const {
@@ -83,9 +87,14 @@ void LockfreeExampleProcessor::prepareToPlay(double sr,
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
   const auto samplesPerCycle = sr / 120.;
-  step =
+  piStep =
       static_cast<float>(juce::MathConstants<double>::twoPi / samplesPerCycle);
+  step = static_cast<float>(1.f / samplesPerCycle);
   vizQueue.resize(static_cast<int>(sr / 60));
+
+  RMSBuffer.setSize(2, static_cast<int>(sr * 0.3));
+  RMSBuffer.clear();
+  RMSBufferPosition = 0;
 }
 
 void LockfreeExampleProcessor::releaseResources() {
@@ -123,35 +132,65 @@ void LockfreeExampleProcessor::processBlock(
     juce::AudioBuffer<float> &buffer, juce::MidiBuffer & /*midiMessages*/) {
   juce::ScopedNoDenormals noDenormals;
 
-  // don't care, just doing mono
-  const auto slowStep = step * 0.001f;
   auto block = juce::dsp::AudioBlock<float>(buffer);
-  auto data = block.getChannelPointer(0);
+  block.fill(0.);
+
   const auto numSamples = block.getNumSamples();
-  for (size_t s = 0; s < numSamples; s++) {
-    const auto sample = std::sin(phase) * std::sin(slowPhase);
-    phase += step;
-    slowPhase += slowStep;
-    data[s] = sample;
-    vizQueue.push(sample);
+  const auto numChannels = block.getNumChannels();
+
+  soundLoader.forEach(
+      [&](std::unique_ptr<musikhack::lockfree::LoadableSound> sound) {
+        loadedSound = std::move(sound);
+        samplePosition = 0;
+      });
+
+  if (loadedSound) {
+    auto smp = loadedSound->getBlock(samplePosition, numSamples);
+    const auto numSamplesRead = smp.getNumSamples();
+    for (size_t c = 0; c < numChannels; c++) {
+      auto data = c > smp.getNumChannels() - 1 ? smp.getChannelPointer(0)
+                                               : smp.getChannelPointer(c);
+      auto dest = block.getChannelPointer(c);
+      if (c == 0) {
+        for (size_t s = 0; s < numSamplesRead; s++) {
+          dest[s] = data[s];
+          vizQueue.push(data[s]);
+        }
+      } else {
+        for (size_t s = 0; s < numSamplesRead; s++) {
+          dest[s] = data[s];
+        }
+      }
+    }
+    samplePosition += numSamples;
+    if (samplePosition >= loadedSound->getNumSamples()) {
+      samplePosition = 0;
+    }
   }
 
-  if (phase > juce::MathConstants<float>::twoPi) {
-    phase -= juce::MathConstants<float>::twoPi;
+  meterQueue.push({MeterType::peak, buffer.getMagnitude(0, (int)numSamples)});
+
+  auto RMSBlock = juce::dsp::AudioBlock<float>(RMSBuffer);
+  const auto numSamplesToCopy =
+      juce::jmin(numSamples, RMSBlock.getNumSamples() - RMSBufferPosition);
+  if (numSamplesToCopy > 0) {
+    auto firstCopyBlock =
+        RMSBlock.getSubBlock(RMSBufferPosition, numSamplesToCopy);
+    firstCopyBlock.copyFrom(block.getSubBlock(0, numSamplesToCopy));
+
+    RMSBufferPosition += numSamplesToCopy;
   }
 
-  if (slowPhase > juce::MathConstants<float>::twoPi) {
-    slowPhase -= juce::MathConstants<float>::twoPi;
+  if (numSamplesToCopy < numSamples) {
+    const auto remainingSamples = numSamples - numSamplesToCopy;
+    auto secondCopyBlock = RMSBlock.getSubBlock(0, remainingSamples);
+    secondCopyBlock.copyFrom(
+        block.getSubBlock(numSamplesToCopy, remainingSamples));
+    RMSBufferPosition = remainingSamples;
   }
 
-  const auto minMax = block.findMinAndMax();
-  const auto max =
-      std::max(std::abs(minMax.getStart()), std::abs(minMax.getEnd()));
-  meterQueue.push({MeterType::peak, max});
-
-  if (numSamples > 0) {
-    meterQueue.push({MeterType::random, random.nextFloat()});
-  }
+  meterQueue.push(
+      {MeterType::rms, RMSBuffer.getRMSLevel(0, 0, RMSBuffer.getNumSamples())});
 }
 
 //==============================================================================

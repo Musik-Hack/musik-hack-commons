@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.2)
 project(JUCE_PLUGINS VERSION 0.0.1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-set(MUSIKHACK_SAMPLES_DIR "${CMAKE_SOURCE_DIR}/sounds")
+set(MUSIKHACK_SAMPLES_DIR "${CMAKE_SOURCE_DIR}/samples")
 
 add_subdirectory(deps/JUCE)
 
