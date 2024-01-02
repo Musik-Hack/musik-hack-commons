@@ -32,6 +32,7 @@ private:
   juce::AudioFormatManager formatManager;
   juce::Array<juce::File> sampleFiles;
   juce::Slider fileSelector;
+  juce::Label title;
   int xPos = 0;
   float lastMeterVal = 0.f;
 

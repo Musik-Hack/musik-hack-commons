@@ -86,13 +86,8 @@ void LockfreeExampleProcessor::prepareToPlay(double sr,
                                              int /*samplesPerBlock*/) {
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
-  const auto samplesPerCycle = sr / 120.;
-  piStep =
-      static_cast<float>(juce::MathConstants<double>::twoPi / samplesPerCycle);
-  step = static_cast<float>(1.f / samplesPerCycle);
-  vizQueue.resize(static_cast<int>(sr / 60));
-
-  RMSBuffer.setSize(2, static_cast<int>(sr * 0.3));
+  vizQueue.resize(static_cast<int>(sr / 30));
+  RMSBuffer.setSize(2, static_cast<int>(sr * 0.3)); // 300ms RMS
   RMSBuffer.clear();
   RMSBufferPosition = 0;
 }

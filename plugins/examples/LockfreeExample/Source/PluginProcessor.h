@@ -68,10 +68,6 @@ public:
   }
 
 private:
-  float step = 0.f;
-  float piStep = 0.f;
-  float phase = 0.f;
-  float slowPhase = 0.f;
   size_t samplePosition = 0;
 
   juce::AudioBuffer<float> RMSBuffer;
