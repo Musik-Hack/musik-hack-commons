@@ -81,6 +81,11 @@ private:
 };
 
 template <typename T, typename Options> class Loader : public juce::Thread {
+  static_assert(std::is_constructible_v<T, Options>,
+                "T must be constructible with Options");
+  static_assert(std::is_default_constructible_v<Options>,
+                "Options must be default constructible");
+
 public:
   // A unique pointer to the object type
   using ObjPtr = std::unique_ptr<T>;
