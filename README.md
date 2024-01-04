@@ -6,7 +6,6 @@ JUCE modules and CMake structure for the common good!
 
 - cmake 3.2+
 - git
-- python3
 - MAC: [XCode](https://apps.apple.com/us/app/xcode/id497799835)
 - WIN: [Visual Studio](https://visualstudio.microsoft.com)
 - WIN: Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development)
