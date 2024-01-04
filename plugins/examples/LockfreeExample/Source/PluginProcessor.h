@@ -11,13 +11,35 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <memory>
 #include <musikhack/lockfree/lockfree.h>
+#include <unordered_map>
 
 //==============================================================================
 /**
  */
 
-enum class MeterType { peak, rms };
-using MeterPair = std::pair<MeterType, float>;
+struct Logger {
+  enum class ID { UNKNOWN, NEW_SOUND, LOOP, RANDOM_MESSAGE };
+  const inline static std::unordered_map<ID, juce::String> TEMPLATES = {
+      {ID::NEW_SOUND, "New sound loaded"},
+      {ID::LOOP, "Sound looped {0}} times"},
+      {ID::UNKNOWN, "UNKNOWN MESSAGE"},
+      {ID::RANDOM_MESSAGE, "Random message {0}"}};
+
+  struct Message {
+    ID id = ID::UNKNOWN;
+    double dbl = 0.;
+  };
+
+  static juce::String format(Message m) {
+    const auto msg = TEMPLATES.find(m.id);
+    if (msg != TEMPLATES.end()) {
+      auto str = msg->second;
+      str = str.replace("{0}", juce::String(m.dbl));
+      return str;
+    }
+    return TEMPLATES.at(ID::UNKNOWN);
+  }
+};
 
 class LockfreeExampleProcessor : public juce::AudioProcessor {
 public:
@@ -29,7 +51,6 @@ public:
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
   musikhack::lockfree::Ring<float> &getVizRing() { return vizRing; }
-  musikhack::lockfree::Queue<MeterPair> &getMeterQueue() { return meterQueue; }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
   bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
@@ -65,14 +86,25 @@ public:
     soundLoader.load(opts);
   }
 
+  musikhack::lockfree::Queue<Logger::Message> &getLogQueue() {
+    return logQueue;
+  }
+
+  float getPeak() const { return peakMeter.load(); }
+  float getRMS() const { return rmsMeter.load(); }
+
 private:
   size_t samplePosition = 0;
+  size_t loopCount = 0;
 
   juce::AudioBuffer<float> RMSBuffer;
   size_t RMSBufferPosition = 0;
 
+  std::atomic<float> peakMeter = 0.f;
+  std::atomic<float> rmsMeter = 0.f;
+
   musikhack::lockfree::Ring<float> vizRing;
-  musikhack::lockfree::Queue<MeterPair> meterQueue;
+  musikhack::lockfree::Queue<Logger::Message> logQueue;
   musikhack::lockfree::SoundLoader soundLoader;
   std::unique_ptr<musikhack::lockfree::LoadableSound> loadedSound;
   //==============================================================================

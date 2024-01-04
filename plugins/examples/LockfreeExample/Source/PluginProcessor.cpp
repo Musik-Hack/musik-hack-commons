@@ -23,7 +23,7 @@ LockfreeExampleProcessor::LockfreeExampleProcessor()
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)
 #endif
               ),
-      vizRing(512), meterQueue(64), soundLoader("SoundLoader", 5, true)
+      vizRing(512), logQueue(1024), soundLoader("SoundLoader", 5, true)
 #endif
 {
   soundLoader.startThread();
@@ -136,6 +136,8 @@ void LockfreeExampleProcessor::processBlock(
       [&](std::unique_ptr<musikhack::lockfree::LoadableSound> sound) {
         loadedSound = std::move(sound);
         samplePosition = 0;
+        logQueue.push({Logger::ID::NEW_SOUND, 0});
+        loopCount = 0;
       });
 
   if (loadedSound) {
@@ -159,10 +161,14 @@ void LockfreeExampleProcessor::processBlock(
     samplePosition += numSamples;
     if (samplePosition >= loadedSound->getNumSamples()) {
       samplePosition = 0;
+      logQueue.push({Logger::ID::LOOP, (double)++loopCount});
+    }
+
+    const auto arbitrarySample = std::abs(block.getSample(0, 0));
+    if (arbitrarySample > 0.21 && arbitrarySample < 0.28) {
+      logQueue.push({Logger::ID::RANDOM_MESSAGE, arbitrarySample});
     }
   }
-
-  meterQueue.push({MeterType::peak, buffer.getMagnitude(0, (int)numSamples)});
 
   auto RMSBlock = juce::dsp::AudioBlock<float>(RMSBuffer);
   const auto numSamplesToCopy =
@@ -183,8 +189,8 @@ void LockfreeExampleProcessor::processBlock(
     RMSBufferPosition = remainingSamples;
   }
 
-  meterQueue.push(
-      {MeterType::rms, RMSBuffer.getRMSLevel(0, 0, RMSBuffer.getNumSamples())});
+  peakMeter = buffer.getMagnitude(0, (int)numSamples);
+  rmsMeter = RMSBuffer.getRMSLevel(0, 0, RMSBuffer.getNumSamples());
 }
 
 //==============================================================================

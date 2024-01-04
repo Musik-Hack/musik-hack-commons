@@ -298,7 +298,7 @@ public:
     };
   }
 
-  juce::String getName() const { return name; }
+  const juce::String &getName() const { return name; }
 
   juce::dsp::AudioBlock<float> getBlock(size_t startSample, size_t numSamples) {
     const auto numSamplesInBuffer = getNumSamples();

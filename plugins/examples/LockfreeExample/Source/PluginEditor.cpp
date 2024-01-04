@@ -8,7 +8,6 @@
 
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
-#include <unordered_map>
 
 //==============================================================================
 LockfreeExampleEditor::LockfreeExampleEditor(LockfreeExampleProcessor &p)
@@ -53,7 +52,11 @@ LockfreeExampleEditor::LockfreeExampleEditor(LockfreeExampleProcessor &p)
 
 LockfreeExampleEditor::~LockfreeExampleEditor() { stopTimer(); }
 
-void LockfreeExampleEditor::timerCallback() { repaint(); }
+void LockfreeExampleEditor::timerCallback() {
+  repaint();
+  audioProcessor.getLogQueue().forEach(
+      [&](Logger::Message const &msg) { DBG(Logger::format(msg)); });
+}
 
 //==============================================================================
 void LockfreeExampleEditor::paint(juce::Graphics &g) {
@@ -61,53 +64,34 @@ void LockfreeExampleEditor::paint(juce::Graphics &g) {
 
   const juce::Colour pink(215, 145, 188);
   const juce::Colour offWhite(247, 244, 242);
+
+  g.setColour(pink);
   auto &ring = audioProcessor.getVizRing();
   const auto maxSamples = ring.getSize();
   const auto increment = (double)maxSamples / (double)getWidth();
-
   auto x = xPos;
+
+  // draw waveform
   audioProcessor.getVizRing().forEach([&](float sample) {
     sample = juce::jlimit(-1.f, 1.f, sample);
-    g.setColour(pink);
     juce::Rectangle<double> pixel(x * increment, (double)sample * 90. + 100.,
                                   increment, 2.);
     g.drawRect(pixel.toFloat(), 1.);
-    // g.drawRect(((double)x * increment),
-    //            100. + (double)sample * 90.), increment, 2.);
     x++;
   });
 
-  // if (x > 0) {
-  //   g.setColour(pink);
-  //   while (x < maxSamples) {
-  //     g.drawRect((int)((double)x * 0.5), 100, 1, 2);
-  //     x++;
-  //   }
-  //   x = 0;
-  // }
-
+  // draw peak and RMS meters
   const auto indicatorWidth = 15.;
-  std::unordered_map<MeterType, bool> done = {{MeterType::peak, false},
-                                              {MeterType::rms, false}};
+  const auto peakVal = audioProcessor.getPeak();
+  lastMeterVal *= 0.9f;
+  lastMeterVal = juce::jmax(peakVal, lastMeterVal);
+  g.setColour(offWhite.withAlpha(lastMeterVal));
+  g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 10), 10,
+                indicatorWidth, indicatorWidth);
 
-  audioProcessor.getMeterQueue().forEach([&](MeterPair &pair) {
-    auto val = juce::jmin(1.f, pair.second);
-
-    if (pair.first == MeterType::peak && !done[MeterType::peak]) {
-      lastMeterVal *= 0.9f;
-      lastMeterVal = juce::jmax(val, lastMeterVal);
-      g.setColour(offWhite.withAlpha(lastMeterVal));
-      g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 10), 10,
-                    indicatorWidth, indicatorWidth);
-      done[MeterType::peak] = true;
-
-    } else if (pair.first == MeterType::rms && !done[MeterType::rms]) {
-      g.setColour(offWhite.withAlpha(val));
-      g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 40), 10,
-                    indicatorWidth, indicatorWidth);
-      done[MeterType::rms] = true;
-    }
-  });
+  g.setColour(offWhite.withAlpha(audioProcessor.getRMS()));
+  g.fillEllipse(static_cast<float>(getWidth() - indicatorWidth - 40), 10,
+                indicatorWidth, indicatorWidth);
 }
 
 void LockfreeExampleEditor::resized() {
