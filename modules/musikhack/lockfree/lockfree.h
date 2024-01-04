@@ -16,6 +16,7 @@
 
 #endif
 
+#include "deps/readerwriterqueue/readerwritercircularbuffer.h"
 #include "deps/readerwriterqueue/readerwriterqueue.h"
 #include <functional>
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -25,16 +26,21 @@
 namespace musikhack {
 namespace lockfree {
 
-template <typename T> class AsyncFifo {
+template <typename T> class Queue {
 public:
   using CallBack = std::function<void(T &)>;
   using TypedQueue = moodycamel::ReaderWriterQueue<T>;
 
-  AsyncFifo(int size = 1024) : queue(size) {}
+  Queue(size_t s = 1024) : size(s), queue(s) {}
+
+  const size_t getSize() const noexcept { return size; }
 
   // Resize the queue, but deletes all existing data.
   // Not thread safe!
-  void resize(int size) { queue = TypedQueue(size); }
+  void resize(int s) {
+    size = s;
+    queue = TypedQueue(s);
+  }
 
   // Wipes out the queue and resets it to its initial state
   // Not thread safe!
@@ -77,6 +83,68 @@ public:
   TypedQueue &getQueue() const noexcept { return queue; }
 
 private:
+  size_t size;
+  TypedQueue queue;
+};
+
+template <typename T> class Ring {
+public:
+  using CallBack = std::function<void(T &)>;
+  using TypedQueue = moodycamel::BlockingReaderWriterCircularBuffer<T>;
+
+  Ring(size_t s = 1024) : size(s), queue(s) {}
+
+  // Resize the queue, but deletes all existing data.
+  // Not thread safe!
+  void resize(int s) {
+    queue = TypedQueue(size);
+    size = s;
+  }
+
+  const size_t getSize() const noexcept { return size; }
+
+  // Wipes out the queue and resets it to its initial state
+  // Not thread safe!
+  void clear() { queue = TypedQueue(queue.max_capacity()); }
+
+  // push an item into the queue
+  bool push(T const &item) { return queue.try_enqueue(item); }
+
+  // push an item into the queue using move semantics
+  bool push(T &&item) { return queue.try_enqueue(item); }
+
+  // push an item into the queue using emplace semantics
+  template <typename... Args> bool emplace(Args &&...args) {
+    return queue.try_emplace(std::forward<Args>(args)...);
+  }
+
+  // pop from the queue into item
+  bool pop(T &item) { return queue.try_dequeue(item); }
+
+  // pop each item out of the queue and run a callback on it
+  void forEach(CallBack cbk) {
+    T item;
+    while (pop(item))
+      cbk(item);
+  }
+
+  // pop each item out of the queue, but only run the callback on the last one
+  void forLast(CallBack cbk) {
+    bool ran = false;
+    T item;
+    while (pop(item)) {
+      ran = true;
+    }
+
+    if (ran)
+      cbk(item);
+  }
+
+  // return a reference to the underlying queue
+  TypedQueue &getQueue() const noexcept { return queue; }
+
+private:
+  size_t size;
   TypedQueue queue;
 };
 

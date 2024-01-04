@@ -28,10 +28,8 @@ public:
   //==============================================================================
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
-  musikhack::lockfree::AsyncFifo<float> &getVizQueue() { return vizQueue; }
-  musikhack::lockfree::AsyncFifo<MeterPair> &getMeterQueue() {
-    return meterQueue;
-  }
+  musikhack::lockfree::Ring<float> &getVizRing() { return vizRing; }
+  musikhack::lockfree::Queue<MeterPair> &getMeterQueue() { return meterQueue; }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
   bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
@@ -73,8 +71,8 @@ private:
   juce::AudioBuffer<float> RMSBuffer;
   size_t RMSBufferPosition = 0;
 
-  musikhack::lockfree::AsyncFifo<float> vizQueue;
-  musikhack::lockfree::AsyncFifo<MeterPair> meterQueue;
+  musikhack::lockfree::Ring<float> vizRing;
+  musikhack::lockfree::Queue<MeterPair> meterQueue;
   musikhack::lockfree::SoundLoader soundLoader;
   std::unique_ptr<musikhack::lockfree::LoadableSound> loadedSound;
   //==============================================================================

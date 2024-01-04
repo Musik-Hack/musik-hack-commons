@@ -23,7 +23,7 @@ LockfreeExampleProcessor::LockfreeExampleProcessor()
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)
 #endif
               ),
-      vizQueue(2048), meterQueue(128), soundLoader("SoundLoader", 5, true)
+      vizRing(512), meterQueue(64), soundLoader("SoundLoader", 5, true)
 #endif
 {
   soundLoader.startThread();
@@ -86,7 +86,6 @@ void LockfreeExampleProcessor::prepareToPlay(double sr,
                                              int /*samplesPerBlock*/) {
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
-  vizQueue.resize(static_cast<int>(sr / 30));
   RMSBuffer.setSize(2, static_cast<int>(sr * 0.3)); // 300ms RMS
   RMSBuffer.clear();
   RMSBufferPosition = 0;
@@ -149,7 +148,7 @@ void LockfreeExampleProcessor::processBlock(
       if (c == 0) {
         for (size_t s = 0; s < numSamplesRead; s++) {
           dest[s] = data[s];
-          vizQueue.push(data[s]);
+          vizRing.push(data[s]);
         }
       } else {
         for (size_t s = 0; s < numSamplesRead; s++) {

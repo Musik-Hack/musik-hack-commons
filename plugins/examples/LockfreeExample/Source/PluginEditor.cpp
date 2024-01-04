@@ -61,33 +61,30 @@ void LockfreeExampleEditor::paint(juce::Graphics &g) {
 
   const juce::Colour pink(215, 145, 188);
   const juce::Colour offWhite(247, 244, 242);
-  const auto maxSamples = getWidth() * 2;
+  auto &ring = audioProcessor.getVizRing();
+  const auto maxSamples = ring.getSize();
+  const auto increment = (double)maxSamples / (double)getWidth();
 
   auto x = xPos;
-  auto draw = true;
-  audioProcessor.getVizQueue().forEach([&](float sample) {
+  audioProcessor.getVizRing().forEach([&](float sample) {
     sample = juce::jlimit(-1.f, 1.f, sample);
-    if (draw) {
-      g.setColour(pink);
-      g.drawRect((int)((double)x * 0.5), 100 + static_cast<int>(sample * 90), 1,
-                 2);
-      x++;
-
-      if (x > maxSamples) {
-        x = 0;
-        draw = false;
-      }
-    }
+    g.setColour(pink);
+    juce::Rectangle<double> pixel(x * increment, (double)sample * 90. + 100.,
+                                  increment, 2.);
+    g.drawRect(pixel.toFloat(), 1.);
+    // g.drawRect(((double)x * increment),
+    //            100. + (double)sample * 90.), increment, 2.);
+    x++;
   });
 
-  if (x > 0) {
-    g.setColour(pink);
-    while (x < maxSamples) {
-      g.drawRect((int)((double)x * 0.5), 100, 1, 2);
-      x++;
-    }
-    x = 0;
-  }
+  // if (x > 0) {
+  //   g.setColour(pink);
+  //   while (x < maxSamples) {
+  //     g.drawRect((int)((double)x * 0.5), 100, 1, 2);
+  //     x++;
+  //   }
+  //   x = 0;
+  // }
 
   const auto indicatorWidth = 15.;
   std::unordered_map<MeterType, bool> done = {{MeterType::peak, false},
