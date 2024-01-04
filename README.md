@@ -5,8 +5,11 @@ JUCE modules and CMake structure for the common good!
 ## Prerequisites
 
 - cmake 3.2+
-- git
 - MAC: [XCode](https://apps.apple.com/us/app/xcode/id497799835)
 - WIN: [Visual Studio](https://visualstudio.microsoft.com)
-- WIN: Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development)
-- WIN: Enable [symlinks in git](https://stackoverflow.com/a/59761201)
+
+In order to use this repository, you must enable symlinks. Inside this repository, run the following command:
+
+    git config --local core.symlinks true
+
+On Windows, you must also enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) in order for the symlinks to work.
