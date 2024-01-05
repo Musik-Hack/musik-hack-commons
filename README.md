@@ -20,3 +20,5 @@ In order to use this repository on Windows, enable [Developer Mode](https://lear
 Alternatively, you can clone the repository with symlinks enabled from the get-go:
 
     git clone -c core.symlinks=true <URL_FROM_GITHUB>
+
+If the project complains about missing files on Windows, it is definitely an issue with the symlinks. Find the file that's "missing", manually delete and git restore the symlink.
