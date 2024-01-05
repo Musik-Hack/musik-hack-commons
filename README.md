@@ -1,6 +1,6 @@
 # Musik Hack Commons
 
-JUCE modules and CMake structure for the common good!
+JUCE modules and CMake structure for the common good! Code written by Musik Hack in this repository is licened under Apache 2, but please check the licenses for each submodule in the deps folder for information about each included library.
 
 ## Prerequisites
 
