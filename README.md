@@ -8,7 +8,11 @@ JUCE modules and CMake structure for the common good!
 - MAC: [XCode](https://apps.apple.com/us/app/xcode/id497799835)
 - WIN: [Visual Studio](https://visualstudio.microsoft.com)
 
-In order to use this repository on windows you must enable symlinks and [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development). Inside this repository, run the following command:
+This repository contains submodules. After cloning your copy, run the following command to pull them into your local repo:
+
+    git submodule update --init
+
+In order to use this repository on Windows, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development). Then, inside this repository, run the following command:
 
     git config --local core.symlinks true
     git restore .
