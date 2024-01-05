@@ -124,7 +124,7 @@ public:
   // pop each item out of the queue and run a callback on it
   void forEach(CallBack cbk) {
     T item;
-    while (pop(item))
+    while (queue.try_dequeue(item))
       cbk(item);
   }
 
@@ -132,7 +132,7 @@ public:
   void forLast(CallBack cbk) {
     bool ran = false;
     T item;
-    while (pop(item)) {
+    while (queue.try_dequeue(item)) {
       ran = true;
     }
 

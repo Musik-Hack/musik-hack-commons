@@ -60,6 +60,10 @@ void LockfreeExampleEditor::timerCallback() {
 
 //==============================================================================
 void LockfreeExampleEditor::paint(juce::Graphics &g) {
+  // This is a bit silly as the oscilliscope and each meter should be their own
+  // components, but for the sake of example, one big component will do. Putting
+  // everything in one paint method like this has performance implications.
+
   g.fillAll(juce::Colour(28, 28, 28));
 
   const juce::Colour pink(215, 145, 188);
