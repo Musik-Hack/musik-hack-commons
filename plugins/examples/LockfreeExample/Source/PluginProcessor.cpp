@@ -8,8 +8,9 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "lockfree/lockfree.h"
 #include <juce_dsp/juce_dsp.h>
+#include <lockfree/lockfree.h>
+
 
 //==============================================================================
 LockfreeExampleProcessor::LockfreeExampleProcessor()
